@@ -6,7 +6,7 @@ if ($LASTEXITCODE -ne 0) { throw "Dev smoke fixture generation failed" }
 Set-Content (Join-Path $root "expect-dev") "dev" -NoNewline
 $out = Join-Path $root "tauri.stdout.log"
 $err = Join-Path $root "tauri.stderr.log"
-$process = Start-Process -FilePath "npm.cmd" -ArgumentList @("run", "tauri", "dev", "--", "--no-watch", "--", "--smoke-test", "`"$root`"") -RedirectStandardOutput $out -RedirectStandardError $err -PassThru -NoNewWindow
+$process = Start-Process -FilePath "npm.cmd" -ArgumentList @("run", "tauri", "dev", "--", "--no-watch", "--", "--", "--smoke-test", "`"$root`"") -RedirectStandardOutput $out -RedirectStandardError $err -PassThru -NoNewWindow
 if (-not $process.WaitForExit(180000)) {
   taskkill /PID $process.Id /T /F | Out-Null
   throw "npm run tauri dev did not finish the desktop runtime smoke within 180 seconds. Inspect .runtime-dev-smoke."
