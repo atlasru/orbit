@@ -1,124 +1,130 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, WebviewWindow};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+mod app;
+mod commands;
+mod diagnostics;
+mod icons;
+mod native;
 
-fn show_launcher(window: &WebviewWindow) {
-    // Center on the monitor containing the launcher window (primary as fallback).
-    if let Some(monitor) = window
-        .current_monitor()
-        .ok()
-        .flatten()
-        .or_else(|| window.primary_monitor().ok().flatten())
-    {
-        let area = monitor.work_area();
-        if let Ok(size) = window.outer_size() {
-            let x = area.position.x + (area.size.width as i32 - size.width as i32) / 2;
-            let y = area.position.y + (area.size.height as i32 - size.height as i32) / 2;
-            if let Err(error) = window.set_position(tauri::Position::Physical(
-                tauri::PhysicalPosition::new(x, y),
-            )) {
-                eprintln!("Orbit: cannot center launcher: {error}");
-            }
-        }
-    }
-    if let Err(error) = window.show().and_then(|_| window.set_focus()) {
-        eprintln!("Orbit: cannot show launcher: {error}");
-    }
-}
-
-#[tauri::command]
-fn hide_launcher(window: WebviewWindow) -> Result<(), String> {
-    window.hide().map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn run_action(action: &str, window: WebviewWindow) -> Result<(), String> {
-    // Fixed built-in allowlist. Never interpolate user content into a command shell.
-    #[cfg(target_os = "windows")]
-    {
-        let (program, argument) = match action {
-            "files" => ("explorer.exe", None),
-            "browser" => ("explorer.exe", Some("https://example.com")),
-            "settings" => ("explorer.exe", Some("ms-settings:")),
-            "terminal" => ("wt.exe", None),
-            _ => return Err("Unknown action".into()),
-        };
-        let mut command = std::process::Command::new(program);
-        if let Some(argument) = argument {
-            command.arg(argument);
-        }
-        command.spawn().map_err(|error| format!("Could not launch {action}: {error}"))?;
-        window.hide().map_err(|error| error.to_string())
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = (action, window);
-        Err("Orbit currently supports Windows only".into())
-    }
-}
+use app::{Runtime, Shared, Status};
+use std::sync::Mutex;
+use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::ShortcutState;
 
 fn main() {
+    let arguments: Vec<String> = std::env::args().collect();
+    if arguments.get(1).is_some_and(|a| a == "--action-fixture") {
+        if arguments.len() == 4 {
+            std::fs::write(&arguments[2], &arguments[3]).expect("Write test fixture");
+        }
+        return;
+    }
+    let smoke_root = arguments
+        .windows(2)
+        .find(|a| a[0] == "--smoke-test")
+        .map(|a| std::path::PathBuf::from(&a[1]));
+    let background = arguments.iter().any(|a| a == "--background");
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            app::toggle(app)
+        }))
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _, event| {
                     if event.state() == ShortcutState::Pressed {
-                        if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                if let Err(error) = window.hide() {
-                                    eprintln!("Orbit: cannot hide launcher: {error}");
-                                }
-                            } else {
-                                show_launcher(&window);
-                            }
-                        }
+                        app::toggle(app);
                     }
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![hide_launcher, run_action])
-        .setup(|app| {
-            // Alt+Space is also used by Windows and other launchers. Never abort startup
-            // merely because a global shortcut is already occupied.
-            let shortcuts = app.global_shortcut();
-            match shortcuts.register("Alt+Space") {
-                Ok(()) => println!("Orbit: shortcut Alt+Space registered"),
-                Err(error) => {
-                    eprintln!("Orbit: Alt+Space unavailable ({error}); trying Alt+Shift+Space");
-                    match shortcuts.register("Alt+Shift+Space") {
-                        Ok(()) => println!("Orbit: shortcut Alt+Shift+Space registered"),
-                        Err(error) => eprintln!(
-                            "Orbit: no shortcut available ({error}); use the system tray > Open Orbit"
-                        ),
-                    }
+        .invoke_handler(tauri::generate_handler![
+            commands::get_bootstrap,
+            commands::frontend_ready,
+            commands::hide_launcher,
+            commands::open_launcher,
+            commands::open_editor,
+            commands::close_editor,
+            commands::save_snapshot,
+            commands::select_profile,
+            commands::preview_launcher,
+            commands::execute_node,
+            commands::resolve_icons,
+            commands::pick_path,
+            commands::pick_icon,
+            commands::export_profile,
+            commands::import_profile,
+            commands::smoke_observation
+        ])
+        .setup(move |app| {
+            let smoke = smoke_root.is_some();
+            let root = smoke_root.clone().unwrap_or(app.path().app_data_dir()?);
+            let store = orbit_core::Store::new(root).map_err(std::io::Error::other)?;
+            let loaded = store.load().map_err(std::io::Error::other)?;
+            let first_run = loaded.first_run;
+            let mut warnings = loaded.warnings;
+            if !smoke {
+                if let Err(e) = native::set_autostart(loaded.snapshot.settings.launch_at_startup) {
+                    warnings.push(format!("Startup setting could not be applied: {e}"));
                 }
             }
-
-            let menu = tauri::menu::Menu::with_items(
-                app,
-                &[
-                    &tauri::menu::MenuItem::with_id(app, "open", "Open Orbit", true, None::<&str>)?,
-                    &tauri::menu::MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?,
-                ],
-            )?;
-            let mut tray = tauri::tray::TrayIconBuilder::new()
-                .menu(&menu)
-                .on_menu_event(|app, event| match event.id().as_ref() {
-                    "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            show_launcher(&window);
-                        }
-                    }
-                    "quit" => app.exit(0),
-                    _ => {}
-                });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
+            let status = Status {
+                requested_shortcut: loaded.snapshot.settings.shortcut.clone(),
+                registered_shortcut: None,
+                shortcut_error: None,
+                warnings,
+                data_directory: store.root.to_string_lossy().into_owned(),
+                frontend_ready: false,
+            };
+            app.manage(Mutex::new(Runtime {
+                store,
+                snapshot: loaded.snapshot,
+                status,
+                preview: None,
+                pending_open: false,
+                epoch: 0,
+                previous_foreground: 0,
+                smoke,
+            }));
+            app::tray(app.handle())?;
+            app::shortcuts(app.handle());
+            let b = app::bootstrap(app.handle()).map_err(std::io::Error::other)?;
+            if !smoke
+                && (!background && first_run
+                    || b.status.shortcut_error.is_some()
+                    || !b.status.warnings.is_empty())
+            {
+                app::editor(app.handle()).map_err(std::io::Error::other)?;
             }
-            tray.build(app)?;
+            diagnostics::write(app.handle());
             Ok(())
         })
+        .on_window_event(|window, event| {
+            let app = window.app_handle();
+            if window.label() == "launcher" {
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        let _ = app::hide(app, true);
+                    }
+                    tauri::WindowEvent::Focused(false) => {
+                        if let Ok(r) = app.state::<Shared>().lock() {
+                            if r.snapshot.settings.close_on_blur
+                                && window.is_visible().unwrap_or(false)
+                            {
+                                app::delayed_hide(app.clone(), 150, r.epoch, true);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            } else if window.label() == "editor" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.emit("editor-close-request", ());
+                }
+            }
+        })
         .run(tauri::generate_context!())
-        .expect("Orbit runtime error");
+        .expect("Orbit failed to start; check WebView2 Runtime and logs in app data");
 }
