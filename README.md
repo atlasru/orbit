@@ -81,7 +81,7 @@ cargo check --workspace --locked
 cargo test --workspace --locked
 ```
 
-Frontend tests use mocked IPC and do not establish native Windows behavior. Windows CI additionally launches the built production executable and exercises real WebView2/IPC and native keyboard input. Its isolated `--smoke-test <directory>` mode does not change normal app data or startup registration. `--action-fixture <file> <text>` is the internal child-process fixture used to verify literal argument execution.
+Frontend tests use mocked IPC and do not establish native Windows behavior. Windows CI verifies the complete `npm run tauri dev` startup and additionally launches the built production executable and exercises real WebView2/IPC and native keyboard input. Its isolated `--smoke-test <directory>` mode does not change normal app data or startup registration. `--action-fixture <file> <text>` is the internal child-process fixture used to verify literal argument execution.
 
 ## Architecture
 

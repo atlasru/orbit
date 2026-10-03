@@ -2412,6 +2412,7 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-single-instance",
  "tempfile",
+ "tokio",
  "windows-sys 0.61.2",
  "winreg",
 ]

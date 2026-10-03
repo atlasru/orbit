@@ -142,7 +142,16 @@ mod win {
     }
 
     pub fn foreground() -> usize {
-        unsafe { GetForegroundWindow() as usize }
+        unsafe {
+            let hwnd = GetForegroundWindow();
+            let mut pid = 0;
+            GetWindowThreadProcessId(hwnd, &mut pid);
+            if pid == std::process::id() {
+                0
+            } else {
+                hwnd as usize
+            }
+        }
     }
 
     pub fn restore_foreground(handle: usize) {
@@ -274,5 +283,21 @@ mod tests {
         )
         .unwrap_err()
         .contains("Cannot start"));
+    }
+}
+
+pub fn fatal(message: &str) {
+    eprintln!("{message}");
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+        let title = wide("Orbit");
+        let text = wide(message);
+        MessageBoxW(
+            std::ptr::null_mut(),
+            text.as_ptr(),
+            title.as_ptr(),
+            MB_ICONERROR | MB_OK,
+        );
     }
 }

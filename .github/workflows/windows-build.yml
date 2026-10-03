@@ -45,6 +45,8 @@ jobs:
         run: cargo check --workspace --locked
       - name: Rust tests
         run: cargo test --workspace --locked
+      - name: Run complete npm/Tauri development startup
+        run: ./scripts/windows-dev-smoke.ps1
       - name: Build Windows executable and installer
         run: npm run tauri build
       - name: Run production Windows application smoke tests
@@ -64,7 +66,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: orbit-validation
+          include-hidden-files: true
           path: |
             .runtime-smoke/
+            .runtime-dev-smoke/
             test-results/
           if-no-files-found: ignore

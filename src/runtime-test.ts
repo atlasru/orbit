@@ -45,6 +45,7 @@ export async function installLauncherSmoke(radial: Radial): Promise<void> {
         check(blocked, 'Rust must independently reject preview execution');
         return { frontendBlocked: true, backendBlocked: true };
       }
+      if (e.payload === 'delay') { await radial.activate(); return { invoked: true }; }
       throw new Error(`Unknown smoke request ${e.payload}`);
     });
   });

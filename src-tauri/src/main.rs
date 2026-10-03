@@ -24,7 +24,8 @@ fn main() {
         .find(|a| a[0] == "--smoke-test")
         .map(|a| std::path::PathBuf::from(&a[1]));
     let background = arguments.iter().any(|a| a == "--background");
-    tauri::Builder::default()
+    let instance_probe = arguments.iter().any(|a| a == "--instance-probe");
+    let result = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             app::toggle(app)
         }))
@@ -98,7 +99,7 @@ fn main() {
                 app::editor(app.handle()).map_err(std::io::Error::other)?;
             }
             diagnostics::write(app.handle());
-            if smoke {
+            if smoke && !instance_probe {
                 diagnostics::run(app.handle().clone());
             }
             Ok(())
@@ -129,6 +130,11 @@ fn main() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("Orbit failed to start; check WebView2 Runtime and logs in app data");
+        .run(tauri::generate_context!());
+    if let Err(error) = result {
+        native::fatal(&format!(
+            "Orbit failed to start: {error}\nCheck WebView2 Runtime and the Orbit data directory."
+        ));
+        std::process::exit(1);
+    }
 }

@@ -154,7 +154,7 @@ export async function startLauncher(root: HTMLElement, bootstrap: Bootstrap): Pr
     selector.hidden = e.payload.preview;
     root.querySelector<HTMLElement>('.launcher-edit')!.hidden = e.payload.preview;
     document.body.focus();
-    void call('smoke_observation', { name: 'launcher-state', value: { profile: e.payload.profile.id, preview: e.payload.preview, nodes: e.payload.profile.nodes.length } }).catch(() => {});
+    if (bootstrap.status.smoke) void call('smoke_observation', { name: 'launcher-state', value: { profile: e.payload.profile.id, preview: e.payload.preview, nodes: e.payload.profile.nodes.length } }).catch(() => {});
   });
   await listen<Bootstrap>('config-changed', e => {
     updateProfiles(e.payload);

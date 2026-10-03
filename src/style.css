@@ -106,7 +106,7 @@ h2 { font-size: 13px; font-weight: 500; margin: 0; }
 .tree-row.drop-target { border-top-color: var(--accent); background: #a89cfa0c; }
 .tree-fold { width: 14px; padding: 0; border: 0; background: none; height: 24px; color: var(--muted); }
 .tree-fold svg { width: 12px; height: 12px; }
-.tree-fold[aria-expanded='true'] svg { transform: rotate(-90deg); }
+.tree-row[aria-expanded='true'] .tree-fold svg { transform: rotate(-90deg); }
 .tree-icon svg { width: 16px; height: 16px; display: block; color: #a3a7b7; }
 .tree-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .tree-count { font-size: 9px; color: var(--muted); }

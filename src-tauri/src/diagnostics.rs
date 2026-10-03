@@ -78,7 +78,7 @@ pub fn run(app: tauri::AppHandle) {
 }
 
 #[cfg(windows)]
-fn wait_for(test: impl Fn() -> bool, description: &str) -> Result<(), String> {
+fn wait_for(mut test: impl FnMut() -> bool, description: &str) -> Result<(), String> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(35);
     while std::time::Instant::now() < deadline {
         if test() {
@@ -169,13 +169,21 @@ fn suite(app: &tauri::AppHandle) -> Result<Vec<String>, String> {
         return Err("Tray did not initialize".into());
     }
     let url = window.url().map_err(|e| e.to_string())?.to_string();
-    if url.contains(":1420") || url.contains("127.0.0.1") {
+    let development = root.join("expect-dev").exists();
+    if development && !url.starts_with("http://127.0.0.1:1420") {
+        return Err(format!("Development loaded the wrong URL: {url}"));
+    }
+    if !development && (url.contains(":1420") || url.contains("127.0.0.1")) {
         return Err(format!("Production still uses Vite: {url}"));
     }
     let mut checks = vec![
         "application started".into(),
         "tray exists".into(),
-        "bundled frontend loaded without Vite".into(),
+        if development {
+            "npm/Tauri desktop loaded the pinned Vite URL".into()
+        } else {
+            "bundled frontend loaded without Vite".into()
+        },
     ];
     if root.join("smoke-complete.json").exists() {
         let b = crate::app::bootstrap(app)?;
@@ -274,6 +282,32 @@ fn suite(app: &tauri::AppHandle) -> Result<Vec<String>, String> {
         return Err("Launcher was recreated".into());
     }
     checks.push("native Escape and persistent window reuse".into());
+    crate::app::hide(app, false)?;
+    let mut second =
+        std::process::Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+            .arg("--smoke-test")
+            .arg(&root)
+            .arg("--instance-probe")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    if let Err(error) = wait_for(
+        || second.try_wait().ok().flatten().is_some(),
+        "second instance exits",
+    ) {
+        let _ = second.kill();
+        return Err(error);
+    }
+    if !second.wait().map_err(|e| e.to_string())?.success() {
+        return Err("Second instance failed".into());
+    }
+    wait_for(
+        || window.is_visible().unwrap_or(false),
+        "second instance activates resident launcher",
+    )?;
+    if window.hwnd().map_err(|e| e.to_string())? != handle {
+        return Err("Second instance replaced launcher".into());
+    }
+    checks.push("second instance exits and activates existing host/window".into());
     crate::app::show(app, Some(b.snapshot.active().clone()))?;
     window
         .emit("smoke-request", "preview")
@@ -292,5 +326,23 @@ fn suite(app: &tauri::AppHandle) -> Result<Vec<String>, String> {
         return Err("Editor executed an action while configuring it".into());
     }
     checks.push("native editor create/type/edit, Undo/Redo, save, profile switching; no execution during editing".into());
+    {
+        let state = app.state::<Shared>();
+        let mut r = state.lock().map_err(|e| e.to_string())?;
+        r.snapshot.settings.close_after_action = true;
+        r.snapshot.settings.close_delay_ms = 500;
+    }
+    crate::app::show(app, None)?;
+    window
+        .emit("smoke-request", "delay")
+        .map_err(|e| e.to_string())?;
+    observation(&root, "ui-delay")?;
+    crate::app::hide(app, false)?;
+    crate::app::show(app, None)?;
+    std::thread::sleep(std::time::Duration::from_millis(750));
+    if !window.is_visible().unwrap_or(false) {
+        return Err("An old action close timer hid a newly opened launcher".into());
+    }
+    checks.push("old close-delay timer cannot hide a newer invocation".into());
     Ok(checks)
 }

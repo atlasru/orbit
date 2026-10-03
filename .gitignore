@@ -3,6 +3,7 @@ dist/
 target/
 src-tauri/gen/
 .runtime-smoke/
+.runtime-dev-smoke/
 test-results/
 playwright-report/
 .DS_Store

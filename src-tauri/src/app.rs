@@ -168,7 +168,10 @@ pub fn show(app: &tauri::AppHandle, preview: Option<Profile>) -> Result<(), Stri
         }
         r.pending_open = false;
         r.epoch += 1;
-        r.previous_foreground = crate::native::foreground();
+        let foreground = crate::native::foreground();
+        if foreground != 0 {
+            r.previous_foreground = foreground;
+        }
         (
             r.snapshot.settings.clone(),
             r.preview
@@ -266,7 +269,7 @@ pub fn toggle(app: &tauri::AppHandle) {
 
 pub fn delayed_hide(app: tauri::AppHandle, delay: u64, epoch: u64, only_unfocused: bool) {
     tauri::async_runtime::spawn(async move {
-        std::thread::sleep(std::time::Duration::from_millis(delay));
+        tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
         let valid = app.state::<Shared>().lock().is_ok_and(|r| r.epoch == epoch);
         if !valid {
             return;
@@ -280,6 +283,15 @@ pub fn delayed_hide(app: tauri::AppHandle, delay: u64, epoch: u64, only_unfocuse
         }
         if let Err(e) = hide(&app, false) {
             report(&app, e);
+        }
+    });
+}
+
+pub fn request_editor(app: &tauri::AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Err(error) = editor(&app) {
+            report(&app, error);
         }
     });
 }
@@ -304,7 +316,10 @@ pub fn tray(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .on_menu_event(|app, event| {
             let result = match event.id().as_ref() {
                 "open" => show(app, None),
-                "editor" => editor(app),
+                "editor" => {
+                    request_editor(app);
+                    Ok(())
+                }
                 "quit" => {
                     app.exit(0);
                     Ok(())
@@ -327,9 +342,7 @@ pub fn tray(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 let app = tray.app_handle();
                 if bootstrap(app).is_ok_and(|b| b.snapshot.settings.tray_click == TrayClick::Editor)
                 {
-                    if let Err(e) = editor(app) {
-                        report(app, e);
-                    }
+                    request_editor(app);
                 } else {
                     toggle(app);
                 }
