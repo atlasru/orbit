@@ -7,15 +7,15 @@
     "dev": "vite",
     "check": "tsc --noEmit",
     "build": "npm run check && vite build",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "node --import tsx --test tests/*.test.ts",
     "test:ui": "playwright test",
     "test:dev": "node scripts/check-dev.mjs",
     "icons": "tauri icon assets/orbit.svg",
     "tauri": "tauri"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@tauri-apps/cli": "~2.12.1",
-    "@playwright/test": "^1.56.0",
     "tsx": "^4.20.0",
     "typescript": "~5.9.3",
     "vite": "^7.1.0"
