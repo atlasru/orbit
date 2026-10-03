@@ -52,9 +52,11 @@ pub fn open_launcher(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_editor(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn open_editor(app: tauri::AppHandle) -> Result<(), String> {
     app::hide(&app, false)?;
-    app::editor(&app)
+    tauri::async_runtime::spawn_blocking(move || app::editor(&app))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -434,4 +436,41 @@ pub fn smoke_observation(
         &r.store.root.join(format!("{name}.json")),
         &serde_json::to_vec(&value).map_err(|e| e.to_string())?,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn import_always_remaps_tree_and_disarms_executables() {
+        let root = tempfile::tempdir().unwrap();
+        let mut profile = Snapshot::default().profiles.remove(0);
+        profile.nodes[0].action = orbit_core::Action::Command {
+            executable: "fixture.exe".into(),
+            args: vec!["& literal".into()],
+            working_directory: None,
+        };
+        let original = profile.clone();
+        let imported = import_bundle(root.path(), &serde_json::to_vec(&profile).unwrap()).unwrap();
+        assert!(!imported.trusted);
+        assert_ne!(imported.id, original.id);
+        assert!(imported
+            .nodes
+            .iter()
+            .all(|n| original.nodes.iter().all(|old| old.id != n.id)));
+        imported.validate().unwrap();
+        assert!(imported.may_execute(&imported.nodes[0]).is_err());
+    }
+    #[test]
+    fn malformed_import_and_unsafe_icon_name_leave_store_untouched() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(import_bundle(root.path(), b"{broken").is_err());
+        let bundle = Bundle {
+            schema_version: 1,
+            profile: Snapshot::default().profiles.remove(0),
+            icons: BTreeMap::from([("../escape.png".into(), "AA==".into())]),
+        };
+        assert!(import_bundle(root.path(), &serde_json::to_vec(&bundle).unwrap()).is_err());
+        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+    }
 }

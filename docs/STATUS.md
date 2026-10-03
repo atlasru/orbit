@@ -1,7 +1,5 @@
-# Phase 1 status
+# Orbit 0.2.0
 
-Prototype only. Source not compiled or runtime-tested in Windows environment.
+The early prototype has been replaced by a modular resident desktop implementation with validated persistence, Windows-native integration, a radial launcher, editor, profiles and settings.
 
-Implemented in source: Tauri shell, shortcut, tray, window visibility, center of current/primary monitor, static radial UI and allowlisted actions.
-
-Known gaps: no app icon assets; Tauri build may require icon.png/icons; active-window monitor selection not implemented; browser and terminal actions need robust Windows ShellExecute integration; no config persistence; no editor; no automated tests; no CI.
+See README for implemented behavior and VALIDATION.md for automated evidence versus the pending real-hardware release gate. A successful Windows Actions run produces the executable and installer. A green compile alone does not establish GUI/runtime or multi-monitor correctness.

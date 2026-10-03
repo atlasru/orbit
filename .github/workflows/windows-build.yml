@@ -6,25 +6,65 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install JavaScript dependencies
-        run: npm install
-      - name: TypeScript and Vite build
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Clean JavaScript install
+        run: npm ci
+      - name: TypeScript and bundled frontend
         run: npm run build
-      - name: Compile Windows executable
-        run: npm run tauri build -- --no-bundle
-      - name: Upload Windows executable
+      - name: Model and navigation tests
+        run: npm test
+      - name: Development startup port contract
+        run: npm run test:dev
+      - name: Frontend interaction tests (mocked IPC)
+        run: npm run test:ui
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Rust check
+        run: cargo check --workspace --locked
+      - name: Rust tests
+        run: cargo test --workspace --locked
+      - name: Build Windows executable and installer
+        run: npm run tauri build
+      - name: Run production Windows application smoke tests
+        run: ./scripts/windows-smoke.ps1
+      - name: Upload Windows executable and installer
         uses: actions/upload-artifact@v4
         with:
           name: orbit-windows-x64
-          path: src-tauri/target/release/orbit.exe
+          path: |
+            target/release/orbit.exe
+            target/release/bundle/nsis/*-setup.exe
+            LICENSE
+            docs/VALIDATION.md
           if-no-files-found: error
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-validation
+          path: |
+            .runtime-smoke/
+            test-results/
+          if-no-files-found: ignore

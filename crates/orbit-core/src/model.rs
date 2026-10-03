@@ -460,6 +460,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn typescript_contract_fixture_roundtrips_without_field_changes() {
+        let value: serde_json::Value =
+            serde_json::from_str(include_str!("../../../tests/fixtures/contract.json")).unwrap();
+        let snapshot: Snapshot = serde_json::from_value(value.clone()).unwrap();
+        snapshot.validate().unwrap();
+        assert_eq!(serde_json::to_value(snapshot).unwrap(), value);
+    }
+
+    #[test]
     fn default_roundtrips() {
         let s = Snapshot::default();
         s.validate().unwrap();

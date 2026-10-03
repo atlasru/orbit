@@ -73,7 +73,7 @@ fn native_icon(_: &str) -> Option<Vec<u8>> {
 
 #[cfg(windows)]
 fn native_icon(path: &str) -> Option<Vec<u8>> {
-    use std::ptr::{null, null_mut};
+    use std::ptr::null_mut;
     use windows_sys::Win32::{
         Graphics::Gdi::{
             CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, BITMAPINFO,
@@ -142,7 +142,21 @@ fn native_icon(path: &str) -> Option<Vec<u8>> {
             }
         }
         let image = image::RgbaImage::from_raw(32, 32, pixels)?;
-        let _ = null::<u8>();
         encode(&DynamicImage::ImageRgba8(image)).ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn custom_icons_are_bounded_normalized_and_roundtrip() {
+        let image = DynamicImage::new_rgba8(256, 256);
+        let bytes = encode(&image).unwrap();
+        let normalized = normalize(&bytes).unwrap();
+        let decoded = image::load_from_memory(&normalized).unwrap();
+        assert_eq!((decoded.width(), decoded.height()), (128, 128));
+        assert!(normalize(b"not an image").is_err());
+        assert!(normalize(&vec![0; 2 * 1024 * 1024 + 1]).is_err());
     }
 }

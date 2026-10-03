@@ -2411,6 +2411,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-global-shortcut",
  "tauri-plugin-single-instance",
+ "tempfile",
  "windows-sys 0.61.2",
  "winreg",
 ]

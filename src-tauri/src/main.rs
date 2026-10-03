@@ -75,6 +75,7 @@ fn main() {
                 warnings,
                 data_directory: store.root.to_string_lossy().into_owned(),
                 frontend_ready: false,
+                smoke,
             };
             app.manage(Mutex::new(Runtime {
                 store,
@@ -97,6 +98,9 @@ fn main() {
                 app::editor(app.handle()).map_err(std::io::Error::other)?;
             }
             diagnostics::write(app.handle());
+            if smoke {
+                diagnostics::run(app.handle().clone());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

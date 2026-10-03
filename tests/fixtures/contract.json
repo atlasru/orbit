@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 2,
+  "revision": 1,
+  "settings": {
+    "shortcut": "Alt+Space",
+    "launchAtStartup": false,
+    "trayClick": "launcher",
+    "closeAfterAction": true,
+    "closeDelayMs": 0,
+    "closeOnBlur": true,
+    "language": "en",
+    "opacity": 0.9,
+    "blur": false,
+    "accent": "#a89cfa",
+    "animations": true,
+    "reducedMotion": false,
+    "showLabels": true,
+    "launcherScale": 1.0,
+    "monitor": "foreground",
+    "keyboard": "directional"
+  },
+  "activeProfileId": "default",
+  "profiles": [
+    {
+      "schemaVersion": 1,
+      "id": "default",
+      "name": "Default",
+      "trusted": true,
+      "nodes": [
+        {
+          "id": "n0",
+          "parentId": null,
+          "label": "application",
+          "icon": {
+            "kind": "auto"
+          },
+          "action": {
+            "kind": "application",
+            "executable": "C:\\Program Files\\app.exe",
+            "args": [
+              "--profile",
+              "one argument",
+              "literal & value"
+            ],
+            "workingDirectory": "C:\\Work"
+          }
+        },
+        {
+          "id": "n1",
+          "parentId": null,
+          "label": "file",
+          "icon": {
+            "kind": "builtin",
+            "name": "file"
+          },
+          "action": {
+            "kind": "file",
+            "path": "C:\\Work\\notes.txt"
+          }
+        },
+        {
+          "id": "n2",
+          "parentId": null,
+          "label": "folder",
+          "icon": {
+            "kind": "custom",
+            "file": "fixture.png"
+          },
+          "action": {
+            "kind": "folder",
+            "path": "%USERPROFILE%\\Documents"
+          }
+        },
+        {
+          "id": "n3",
+          "parentId": null,
+          "label": "url",
+          "icon": {
+            "kind": "auto"
+          },
+          "action": {
+            "kind": "url",
+            "url": "https://example.com"
+          }
+        },
+        {
+          "id": "n4",
+          "parentId": null,
+          "label": "command",
+          "icon": {
+            "kind": "auto"
+          },
+          "action": {
+            "kind": "command",
+            "executable": "tool.exe",
+            "args": [],
+            "workingDirectory": null
+          }
+        },
+        {
+          "id": "n5",
+          "parentId": null,
+          "label": "submenu",
+          "icon": {
+            "kind": "auto"
+          },
+          "action": {
+            "kind": "submenu"
+          }
+        },
+        {
+          "id": "n6",
+          "parentId": "n5",
+          "label": "system",
+          "icon": {
+            "kind": "auto"
+          },
+          "action": {
+            "kind": "system",
+            "action": "windowsSettings"
+          }
+        }
+      ]
+    }
+  ]
+}

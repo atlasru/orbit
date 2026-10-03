@@ -16,6 +16,7 @@ pub struct Status {
     pub warnings: Vec<String>,
     pub data_directory: String,
     pub frontend_ready: bool,
+    pub smoke: bool,
 }
 
 pub struct Runtime {
@@ -136,11 +137,11 @@ pub fn apply_effects(app: &tauri::AppHandle) {
             window.set_effects(Some(
                 EffectsBuilder::new()
                     .effect(Effect::Acrylic)
-                    .color((20, 22, 29, 210))
+                    .color((20, 22, 29, 210).into())
                     .build(),
             ))
         } else {
-            window.set_effects(None::<tauri::window::WindowEffectsConfig>)
+            window.set_effects(None::<tauri::utils::config::WindowEffectsConfig>)
         };
         if let Err(e) = result {
             report(
